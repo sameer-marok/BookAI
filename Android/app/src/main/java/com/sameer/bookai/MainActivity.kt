@@ -31,6 +31,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sameer.bookai.auth.AuthViewModel
 import com.sameer.bookai.ui.theme.BookAITheme
 
 private val BookAIBackground = Color(0xFFFCFCFE)
@@ -51,9 +54,13 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun SignInScreen() {
+fun SignInScreen(
+    viewModel: AuthViewModel = viewModel()
+) {
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
+
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier
@@ -155,7 +162,7 @@ fun SignInScreen() {
         // Sign in button
         Button(
             onClick = {
-                // Firebase login will go here later
+                viewModel.signIn(email, password)
             },
             modifier = Modifier
                 .fillMaxWidth()
@@ -166,7 +173,7 @@ fun SignInScreen() {
             )
         ) {
             Text(
-                text = "Sign In",
+                text = if (uiState.isLoading) "Signing In..." else "Sign In",
                 fontSize = 17.sp
             )
         }
