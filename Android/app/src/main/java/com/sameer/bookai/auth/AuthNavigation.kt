@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.google.firebase.auth.FirebaseAuth
 import com.sameer.bookai.SignInScreen
 import com.sameer.bookai.SignUpScreen
 
@@ -12,10 +13,17 @@ import com.sameer.bookai.SignUpScreen
 fun AuthNavigation() {
 
     val navController = rememberNavController()
+    val auth = FirebaseAuth.getInstance()
 
+    // Determine the start destination based on the user's authentication state
+    val startDestination = if (auth.currentUser != null) {
+        "home"
+    } else {
+        "sign_in"
+    }
     NavHost(
         navController = navController,
-        startDestination = "sign_in"
+        startDestination = startDestination
     ) {
         // Sign in screen
         composable("sign_in") {
