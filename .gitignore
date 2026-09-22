@@ -16,6 +16,7 @@ Backend/node_modules/
 Backend/dist/
 Backend/.env
 Backend/.env.*
+Backend/credentials/
 
 # Logs
 *.log
