@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.services)
+    kotlin("plugin.serialization") version "2.2.10" // Kotlin Serialization plugin
 }
 
 android {
@@ -35,10 +36,21 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true // Enable BuildConfig generation
     }
 }
 
 dependencies {
+    implementation(libs.androidx.lifecycle.viewmodel)
+    implementation(libs.kotlinx.coroutines.play.services)
+    // Retrofit HTTP client
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.kotlinx.serialization)
+    // OkHttp Logging Interceptor
+    implementation(libs.logging.interceptor)
+    // Kotlin Serialization JSON library for parsing JSON
+    implementation(libs.kotlinx.serialization.json)
+
     implementation(libs.androidx.navigation.compose)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
@@ -53,7 +65,6 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     testImplementation(libs.junit)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)

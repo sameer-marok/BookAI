@@ -1,11 +1,16 @@
 package com.sameer.bookai.auth
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.google.firebase.auth.FirebaseAuth
+import com.sameer.bookai.HomeScreen
 import com.sameer.bookai.SignInScreen
 import com.sameer.bookai.SignUpScreen
 
@@ -60,7 +65,7 @@ fun AuthNavigation() {
         }
         // Home screen
         composable("home") {
-            Text("Home")
+            HomeScreen()
         }
     }
 }
