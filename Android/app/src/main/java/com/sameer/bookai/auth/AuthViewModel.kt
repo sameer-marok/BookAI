@@ -1,9 +1,14 @@
 package com.sameer.bookai.auth
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
+import com.sameer.bookai.data.remote.RetrofitInstance
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 data class AuthUiState(
     val isLoading: Boolean = false,
@@ -67,6 +72,36 @@ class AuthViewModel : ViewModel() {
                     )
                 }
             }
+    }
+
+    fun testBackend() {
+        viewModelScope.launch {
+            try {
+                val user = FirebaseAuth.getInstance().currentUser
+
+                if (user == null) {
+                    Log.e("BookAI", "No authenticated user")
+                    return@launch
+                }
+
+                val token = user.getIdToken(false).await().token
+
+                if (token == null) {
+                    Log.e("BookAI", "Failed to get Firebase ID token")
+                    return@launch
+                }
+
+                val response = RetrofitInstance.api.getProtected(
+                    "Bearer $token"
+                )
+
+                Log.d("BookAI", "Backend response: ${response.message}")
+                Log.d("BookAI", "Backend user: ${response.user.uid}")
+
+            } catch (e: Exception) {
+                Log.e("BookAI", "Backend request failed", e)
+            }
+        }
     }
 
 }

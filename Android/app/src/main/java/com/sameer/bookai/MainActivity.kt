@@ -1,6 +1,5 @@
 package com.sameer.bookai
 
-import android.annotation.SuppressLint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -434,6 +433,19 @@ fun SignUpScreen(
                 }
             )
         }
+    }
+}
+
+@Composable
+fun HomeScreen(
+    viewModel: AuthViewModel = viewModel(),
+) {
+    Button(
+        onClick = {
+            viewModel.testBackend()
+        }
+    ) {
+        Text("Test")
     }
 }
 
