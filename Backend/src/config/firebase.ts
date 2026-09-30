@@ -1,9 +1,10 @@
 import { cert, initializeApp } from "firebase-admin/app";
+import { env } from "./env";
 
 // Firebase service account configuration
- const projectId = process.env.FIREBASE_PROJECT_ID;
- const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
- const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+ const projectId = env.firebase.projectId;
+ const clientEmail = env.firebase.clientEmail;
+ const privateKey = env.firebase.privateKey;
  if (!projectId || !clientEmail || !privateKey) {
      throw new Error("Firebase credentials are not configured");
  }
