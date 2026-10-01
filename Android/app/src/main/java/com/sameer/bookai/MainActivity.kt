@@ -439,13 +439,15 @@ fun SignUpScreen(
 @Composable
 fun HomeScreen(
     viewModel: AuthViewModel = viewModel(),
+    onSignOutClicked: () -> Unit
 ) {
     Button(
         onClick = {
-            viewModel.testBackend()
+            viewModel.signOut()
+            onSignOutClicked()
         }
     ) {
-        Text("Test")
+        Text("Sign Out")
     }
 }
 

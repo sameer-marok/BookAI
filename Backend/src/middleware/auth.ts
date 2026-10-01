@@ -24,7 +24,7 @@ export async function authenticate(
         const decodedToken = await getAuth().verifyIdToken(idToken);
         // use the decoded token to attach user information to the request
         req.user = {
-            uid: decodedToken.uid,
+            firebaseUid: decodedToken.uid,
             email: decodedToken.email,
         };
         // Pass control to the next middleware function

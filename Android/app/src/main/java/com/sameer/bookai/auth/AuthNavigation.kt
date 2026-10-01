@@ -65,7 +65,15 @@ fun AuthNavigation() {
         }
         // Home screen
         composable("home") {
-            HomeScreen()
+            HomeScreen(
+                onSignOutClicked = {
+                    navController.navigate("sign_in") {
+                        popUpTo("home") {
+                            inclusive = true
+                        }
+                    }
+                }
+            )
         }
     }
 }
