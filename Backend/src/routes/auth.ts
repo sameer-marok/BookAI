@@ -16,7 +16,7 @@ router.post("/session", authenticate, async (req, res) => {
 
         // Find or create the user in the database
         const user = await findOrCreateUser(
-            req.user!.uid,
+            req.user!.firebaseUid,
             email
         );
 

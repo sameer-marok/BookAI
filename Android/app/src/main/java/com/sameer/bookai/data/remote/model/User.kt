@@ -4,6 +4,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class User(
-    val uid: String,
+    val firebaseUid: String,
     val email: String? = null
 )

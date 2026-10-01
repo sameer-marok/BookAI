@@ -42,7 +42,7 @@ class AuthViewModel : ViewModel() {
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     // Login successful
-                    _uiState.value = AuthUiState(isLoggedIn = true)
+                    createBackendSession()
                 } else {
                     // Login failed
                     _uiState.value = AuthUiState(
@@ -63,7 +63,7 @@ class AuthViewModel : ViewModel() {
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     // Sign Up successful
-                    _uiState.value = AuthUiState(isLoggedIn = true)
+                    createBackendSession()
                 } else {
                     // Sign Up failed
                     _uiState.value = AuthUiState(
@@ -73,35 +73,56 @@ class AuthViewModel : ViewModel() {
                 }
             }
     }
-
-    fun testBackend() {
+    // Function to create a backend session after successful Firebase authentication
+    private fun createBackendSession() {
         viewModelScope.launch {
             try {
-                val user = FirebaseAuth.getInstance().currentUser
+                // Get the currently authenticated user
+                val user = auth.currentUser
 
                 if (user == null) {
-                    Log.e("BookAI", "No authenticated user")
+                    _uiState.value = AuthUiState(
+                        errorMessage = "No authenticated user"
+                    )
                     return@launch
                 }
-
-                val token = user.getIdToken(false).await().token
+                // Get the Firebase ID token for the authenticated user
+                val token= user.getIdToken(false).await().token
 
                 if (token == null) {
-                    Log.e("BookAI", "Failed to get Firebase ID token")
+                    _uiState.value = AuthUiState(
+                        errorMessage = "Failed to get Firebase ID token"
+                    )
                     return@launch
                 }
-
-                val response = RetrofitInstance.api.getProtected(
+                // Make a request to the backend to create a session using the Firebase ID token
+                val response = RetrofitInstance.api.createSession(
                     "Bearer $token"
                 )
 
-                Log.d("BookAI", "Backend response: ${response.message}")
-                Log.d("BookAI", "Backend user: ${response.user.uid}")
+                Log.d(
+                    "BookAI",
+                    "Backend user: ${response.user.firebaseUid}"
+                )
+
+                _uiState.value = AuthUiState(
+                    isLoggedIn = true // Set isLoggedIn to true after successful backend session creation
+                )
 
             } catch (e: Exception) {
-                Log.e("BookAI", "Backend request failed", e)
+                Log.e("BookAI", "Backend session creation failed", e)
+
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "Failed to connect to backend: ${e.message}"
+                )
             }
         }
+    }
+
+    fun signOut() {
+        auth.signOut()
+        _uiState.value = AuthUiState(isLoggedIn = false)
     }
 
 }
