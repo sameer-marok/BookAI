@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -194,6 +196,7 @@ fun SignInScreen(
             onClick = {
                 viewModel.signIn(email, password)
             },
+            enabled = !uiState.isLoading,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(58.dp),
@@ -448,6 +451,31 @@ fun HomeScreen(
         }
     ) {
         Text("Sign Out")
+    }
+}
+
+@Composable
+fun SplashScreen(
+    viewModel: AuthViewModel = viewModel(),
+    onSessionChecked: (Boolean) -> Unit
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    // Check session when the SplashScreen is first composed
+    LaunchedEffect(Unit) {
+        viewModel.checkSession()
+    }
+    // Observe the isSessionChecked state and call onSessionChecked when it becomes true
+    LaunchedEffect(uiState.isSessionChecked) {
+        if (uiState.isSessionChecked) {
+            onSessionChecked(uiState.isLoggedIn)
+        }
+    }
+
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator()
     }
 }
 

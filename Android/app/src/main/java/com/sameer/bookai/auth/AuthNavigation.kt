@@ -1,11 +1,6 @@
 package com.sameer.bookai.auth
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -13,6 +8,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.sameer.bookai.HomeScreen
 import com.sameer.bookai.SignInScreen
 import com.sameer.bookai.SignUpScreen
+import com.sameer.bookai.SplashScreen
 
 @Composable
 fun AuthNavigation() {
@@ -20,16 +16,31 @@ fun AuthNavigation() {
     val navController = rememberNavController()
     val auth = FirebaseAuth.getInstance()
 
-    // Determine the start destination based on the user's authentication state
-    val startDestination = if (auth.currentUser != null) {
-        "home"
-    } else {
-        "sign_in"
-    }
     NavHost(
         navController = navController,
-        startDestination = startDestination
+        startDestination = "splash"
     ) {
+        //Splash screen
+        composable("splash") {
+            SplashScreen(
+                onSessionChecked = { isLoggedIn ->
+                    if (isLoggedIn) {
+                        navController.navigate("home") {
+                            popUpTo("splash") {
+                                inclusive = true
+                            }
+                        }
+                    } else {
+                        navController.navigate("sign_in") {
+                            popUpTo("splash") {
+                                inclusive = true
+                            }
+                        }
+                    }
+                }
+            )
+        }
+
         // Sign in screen
         composable("sign_in") {
             SignInScreen(
