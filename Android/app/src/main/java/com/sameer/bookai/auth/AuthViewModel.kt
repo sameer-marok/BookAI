@@ -13,6 +13,8 @@ import kotlinx.coroutines.tasks.await
 data class AuthUiState(
     val isLoading: Boolean = false,
     val isLoggedIn: Boolean = false,
+    // Indicates whether the session check has been performed
+    val isSessionChecked: Boolean = false,
     val errorMessage: String? = null
 )
 
@@ -82,6 +84,7 @@ class AuthViewModel : ViewModel() {
 
                 if (user == null) {
                     _uiState.value = AuthUiState(
+                        isSessionChecked = true,
                         errorMessage = "No authenticated user"
                     )
                     return@launch
@@ -91,6 +94,7 @@ class AuthViewModel : ViewModel() {
 
                 if (token == null) {
                     _uiState.value = AuthUiState(
+                        isSessionChecked = true,
                         errorMessage = "Failed to get Firebase ID token"
                     )
                     return@launch
@@ -106,7 +110,8 @@ class AuthViewModel : ViewModel() {
                 )
 
                 _uiState.value = AuthUiState(
-                    isLoggedIn = true // Set isLoggedIn to true after successful backend session creation
+                    isLoggedIn = true, // Set isLoggedIn to true after successful backend session creation
+                    isSessionChecked = true
                 )
 
             } catch (e: Exception) {
@@ -114,6 +119,7 @@ class AuthViewModel : ViewModel() {
 
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
+                    isSessionChecked = true,
                     errorMessage = "Failed to connect to backend: ${e.message}"
                 )
             }
@@ -123,6 +129,21 @@ class AuthViewModel : ViewModel() {
     fun signOut() {
         auth.signOut()
         _uiState.value = AuthUiState(isLoggedIn = false)
+    }
+
+    fun checkSession() {
+        val user = auth.currentUser
+
+        if (user == null) {
+            _uiState.value = AuthUiState(
+                isSessionChecked = true
+            )
+            return
+        }
+
+        _uiState.value = AuthUiState(isLoading = true)
+
+        createBackendSession()
     }
 
 }
