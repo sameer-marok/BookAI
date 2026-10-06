@@ -24,7 +24,11 @@ router.get("/", authenticate, async (req, res) => {
             userId: user._id // Filter books by the user's ID (MongoDB ObjectId)
         })
 
-        res.json(books)
+        // Respond with the list of books, mapping each book to include only the id and title
+        res.json(books.map(book => ({
+            id: book._id.toString(),
+            title: book.title,
+        })))
 
     } catch (error) {
         console.error("Failed to fetch books", error);
@@ -66,7 +70,7 @@ router.post("/", authenticate, async (req, res) => {
 
         res.status(201).json({
             book: {
-                id: book._id,
+                id: book._id.toString(),
                 title: book.title,
             },
         });

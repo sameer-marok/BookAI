@@ -10,10 +10,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -39,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sameer.bookai.auth.AuthNavigation
 import com.sameer.bookai.auth.AuthViewModel
+import com.sameer.bookai.books.BookViewModel
 import com.sameer.bookai.ui.theme.BookAITheme
 
 private val BookAIBackground = Color(0xFFFCFCFE)
@@ -441,16 +445,61 @@ fun SignUpScreen(
 
 @Composable
 fun HomeScreen(
-    viewModel: AuthViewModel = viewModel(),
+    bookViewModel: BookViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel(),
     onSignOutClicked: () -> Unit
 ) {
-    Button(
-        onClick = {
-            viewModel.signOut()
-            onSignOutClicked()
-        }
+    val uiState by bookViewModel.uiState.collectAsStateWithLifecycle()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BookAIBackground)
+            .padding(horizontal = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Text("Sign Out")
+        if (uiState.isLoading) CircularProgressIndicator()
+
+        uiState.errorMessage?.let {
+            Text(text = it)
+        }
+
+        LazyColumn(modifier = Modifier
+            .fillMaxWidth()
+            .weight(1f), // Fill remaining space after other UI elements
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            items(uiState.books) { book ->
+                Text(
+                    text = book.title,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+        }
+
+        Button(
+            onClick = {
+                bookViewModel.loadBooks()
+            },
+            enabled = !uiState.isLoading
+        ) {
+            Text("Refresh")
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Button(
+            onClick = {
+                authViewModel.signOut()
+                onSignOutClicked()
+            }
+        ) {
+            Text("Sign Out")
+        }
+
+        Spacer(modifier = Modifier.height(30.dp))
     }
 }
 
