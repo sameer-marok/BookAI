@@ -1,8 +1,13 @@
 package com.sameer.bookai
 
+import android.content.Context
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,12 +23,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
@@ -449,9 +457,38 @@ fun HomeScreen(
     authViewModel: AuthViewModel = viewModel(),
     onSignOutClicked: () -> Unit
 ) {
+    val context = LocalContext.current
+
     val uiState by bookViewModel.uiState.collectAsStateWithLifecycle()
     // State for the new book title
-    var title by rememberSaveable { mutableStateOf("") }
+    var bookTitle  by rememberSaveable { mutableStateOf("") }
+    var showTitleDialog by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    // State for the selected PDF URI
+    var selectedPdfUri by rememberSaveable {
+        mutableStateOf<Uri?>(null)
+    }
+    // Launcher for the PDF picker
+    val pdfPicker = rememberLauncherForActivityResult(
+        // Use OpenDocument to allow the user to pick a PDF file
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            selectedPdfUri = uri
+
+            val fileName = getFileName(context, uri)
+                ?: "Untitled Book"
+
+            bookTitle = fileName.substringBeforeLast(
+                ".",
+                fileName
+            )
+
+            showTitleDialog = true
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -465,6 +502,56 @@ fun HomeScreen(
 
         uiState.errorMessage?.let {
             Text(text = it)
+        }
+        // Show the dialog to enter the book title when a PDF is selected
+        if (showTitleDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    showTitleDialog = false
+                    selectedPdfUri = null
+                    bookTitle = ""
+                },
+                title = {
+                    Text("Choose a title for your book")
+                },
+                text = {
+                    OutlinedTextField(
+                        value = bookTitle,
+                        onValueChange = { bookTitle = it },
+                        label = {
+                            Text("Book title")
+                        },
+                        singleLine = true
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            if (bookTitle.isNotBlank()) {
+                                // TODO: Upload the book
+                                bookViewModel.createBook(bookTitle.trim())
+                                showTitleDialog = false
+                                selectedPdfUri = null
+                                bookTitle = ""
+                            }
+                        },
+                        enabled = bookTitle.isNotBlank() && !uiState.isLoading
+                    ) {
+                        Text("Upload")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showTitleDialog = false
+                            selectedPdfUri = null
+                            bookTitle = ""
+                        }
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            )
         }
 
         LazyColumn(modifier = Modifier
@@ -481,24 +568,14 @@ fun HomeScreen(
             }
         }
 
-        OutlinedTextField(
-            value = title,
-            onValueChange = { title = it },
-            placeholder = {
-                Text("New Book Title")
-            },
-            singleLine = true,
-            enabled = !uiState.isLoading,
-        )
-
         Button(
             onClick = {
-                bookViewModel.createBook(title.trim())
-                title = ""
+                // Launch the PDF picker when the button is clicked
+                pdfPicker.launch(arrayOf("application/pdf"))
             },
-            enabled = title.isNotBlank() && !uiState.isLoading
+            enabled = !uiState.isLoading
         ) {
-            Text("Create Book")
+            Text("Select PDF")
         }
 
         Button(
@@ -522,6 +599,36 @@ fun HomeScreen(
         }
 
         Spacer(modifier = Modifier.height(30.dp))
+    }
+}
+
+// Helper function to get the file name from a Uri
+private fun getFileName(
+    context: Context,
+    uri: Uri
+): String? {
+    val cursor = context.contentResolver.query(
+        uri,
+        null,
+        null,
+        null,
+        null
+    )
+
+    return cursor?.use {
+        if (it.moveToFirst()) {
+            val nameIndex = it.getColumnIndex(
+                OpenableColumns.DISPLAY_NAME
+            )
+
+            if (nameIndex != -1) {
+                it.getString(nameIndex)
+            } else {
+                null
+            }
+        } else {
+            null
+        }
     }
 }
 
