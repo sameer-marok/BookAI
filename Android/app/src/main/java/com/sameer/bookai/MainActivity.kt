@@ -450,6 +450,8 @@ fun HomeScreen(
     onSignOutClicked: () -> Unit
 ) {
     val uiState by bookViewModel.uiState.collectAsStateWithLifecycle()
+    // State for the new book title
+    var title by rememberSaveable { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -477,6 +479,26 @@ fun HomeScreen(
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
             }
+        }
+
+        OutlinedTextField(
+            value = title,
+            onValueChange = { title = it },
+            placeholder = {
+                Text("New Book Title")
+            },
+            singleLine = true,
+            enabled = !uiState.isLoading,
+        )
+
+        Button(
+            onClick = {
+                bookViewModel.createBook(title.trim())
+                title = ""
+            },
+            enabled = title.isNotBlank() && !uiState.isLoading
+        ) {
+            Text("Create Book")
         }
 
         Button(

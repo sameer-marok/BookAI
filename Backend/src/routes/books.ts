@@ -69,10 +69,8 @@ router.post("/", authenticate, async (req, res) => {
         })
 
         res.status(201).json({
-            book: {
-                id: book._id.toString(),
-                title: book.title,
-            },
+            id: book._id.toString(),
+            title: book.title,
         });
 
     } catch (error) {
