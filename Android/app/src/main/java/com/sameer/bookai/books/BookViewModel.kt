@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.sameer.bookai.data.remote.RetrofitInstance
 import com.sameer.bookai.data.remote.model.Book
+import com.sameer.bookai.data.remote.model.CreateBookRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -32,13 +33,14 @@ class BookViewModel: ViewModel() {
 
     fun loadBooks() {
         viewModelScope.launch {
-            _uiState.value = BookUiState(isLoading = true)
+            _uiState.value = _uiState.value.copy(isLoading = true)
 
             try {
                 val user = auth.currentUser
 
                 if (user == null) {
-                    _uiState.value = BookUiState(
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
                         errorMessage = "User is not authenticated"
                     )
                     return@launch
@@ -47,7 +49,8 @@ class BookViewModel: ViewModel() {
                 val token = user.getIdToken(false).await().token
 
                 if (token == null) {
-                    _uiState.value = BookUiState(
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
                         errorMessage = "Failed to get Firebase ID token"
                     )
                     return@launch
@@ -62,8 +65,57 @@ class BookViewModel: ViewModel() {
                 )
 
             } catch (e: Exception) {
-                _uiState.value = BookUiState(
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
                     errorMessage = e.message ?: "Failed to load books"
+                )
+            }
+        }
+    }
+
+    fun createBook(title: String) {
+        viewModelScope.launch {
+            // using copy to update the existing state while keeping other properties intact
+            _uiState.value = _uiState.value.copy(isLoading = true)
+
+            try {
+                val user = auth.currentUser
+
+                if (user == null) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = "User is not authenticated"
+                    )
+                    return@launch
+                }
+
+                val token = user.getIdToken(false).await().token
+
+                if (token == null) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = "Failed to get Firebase ID token"
+                    )
+                    return@launch
+                }
+
+                val newBook = RetrofitInstance.api.createBook(
+                    "Bearer $token",
+                    CreateBookRequest(title)
+                )
+
+                // Update the UI state with the newly created book
+                val updatedBooks = _uiState.value.books + newBook
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    books = updatedBooks,
+                    errorMessage = null
+                )
+
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = e.message ?: "Failed to create book"
                 )
             }
         }
