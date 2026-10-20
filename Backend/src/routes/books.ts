@@ -2,8 +2,23 @@ import {Router} from 'express';
 import { authenticate } from "../middleware/auth.js"
 import { User } from '../models/User.js';
 import { Book } from '../models/Book.js';
+import multer from "multer";
+import { randomUUID } from "node:crypto";
+import { DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { uploadPdf } from "../services/s3Service.js";
+import { s3 } from "../config/s3.js";
+import { env } from "../config/env.js";
 
 const router = Router();
+
+// Configure multer for handling file uploads in memory
+const upload = multer({
+    storage: multer.memoryStorage(), // Store uploaded files in memory as Buffer objects
+    limits: {
+        fileSize: 20 * 1024 * 1024, // 20 MB
+        files: 1,
+    },
+});
 
 // Route to fetch all books associated with the authenticated user
 router.get("/", authenticate, async (req, res) => {
@@ -39,47 +54,91 @@ router.get("/", authenticate, async (req, res) => {
     }
 })
 
-// Route to create a new book for the authenticated user
-router.post("/", authenticate, async (req, res) => {
+// Route to upload a PDF for a specific book
+router.post("/upload", authenticate, upload.single("file"), async (req, res) => {
+    let fileKey: string | undefined;
+    let uploadedToS3 = false;
+
     try {
-        // Find the user associated with the authenticated request
-        const user = await User.findOne({
-            firebaseUid: req.user?.firebaseUid
-        })
+        const { title } = req.body;
+        const file = req.file; // file type is coming from multer
 
-        if (!user) {
-            return res.status(404).json({
-                message: "User not found"
-            })
-        }
-        // Extract the title of the new book from the request body
-        const {title} = req.body
-
-        // Validate the title of the new book
-        // Ensure the title is a non-empty string
         if (typeof title !== "string" || !title.trim()) {
             return res.status(400).json({
                 message: "Title is required",
             });
         }
-        // Create a new book associated with the user
+
+        if (!file) {
+            return res.status(400).json({
+                message: "PDF file is required",
+            });
+        }
+
+        // Basic PDF validation
+        if (
+            file.mimetype !== "application/pdf" ||
+            file.buffer.subarray(0, 5).toString() !== "%PDF-" // Check the PDF file header for validity
+        ) {
+            return res.status(400).json({
+                message: "A valid PDF file is required",
+            });
+        }
+
+        const user = await User.findOne({
+            firebaseUid: req.user?.firebaseUid,
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found",
+            });
+        }
+
+        // Generate a unique key for this user's PDF
+        fileKey = `users/${user._id}/books/${randomUUID()}.pdf`;
+
+        await uploadPdf({
+            fileKey,
+            buffer: file.buffer,
+            contentType: "application/pdf",
+        });
+
+        uploadedToS3 = true;
+
+        // Save metadata only after S3 upload succeeds
         const book = await Book.create({
             userId: user._id,
-            title
-        })
+            title: title.trim(),
+            fileKey,
+        });
 
-        res.status(201).json({
+        return res.status(201).json({
             id: book._id.toString(),
             title: book.title,
         });
-
     } catch (error) {
-        console.error("Failed to create book", error);
+        console.error("Failed to upload book", error);
 
-        res.status(500).json({
-            message: "Failed to create book",
+        // Avoid leaving an orphaned PDF if MongoDB creation fails
+        if (uploadedToS3 && fileKey) {
+            try {
+                await s3.send(
+                    new DeleteObjectCommand({
+                        Bucket: env.aws.s3Bucket,
+                        Key: fileKey,
+                    }),
+                );
+            } catch (cleanupError) {
+                console.error("Failed to clean up S3 object", cleanupError);
+            }
+        }
+
+        return res.status(500).json({
+            message: "Failed to upload book",
         });
     }
-})
+});
+
 
 export default router

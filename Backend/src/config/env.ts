@@ -18,7 +18,15 @@ export const env = {
         clientEmail: getEnv("FIREBASE_CLIENT_EMAIL"),
         privateKey: getEnv("FIREBASE_PRIVATE_KEY").replace(/\\n/g, "\n"),
     },
+    
     mongodb: {
         uri: getEnv("MONGODB_URI"),
+    },
+
+    aws: {
+        region: getEnv("AWS_REGION"),
+        accessKeyId: getEnv("AWS_ACCESS_KEY_ID"),
+        secretAccessKey: getEnv("AWS_SECRET_ACCESS_KEY"),
+        s3Bucket: getEnv("AWS_S3_BUCKET"),
     },
 };
