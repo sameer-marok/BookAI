@@ -3,6 +3,7 @@ import healthRouter from "./routes/health.js"
 import authRouter from "./routes/auth.js"
 import bookRouter from "./routes/books.js"
 import "./config/firebase.js"; // Initialize Firebase configuration
+import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
 
@@ -12,5 +13,8 @@ app.use(express.json());
 app.use("/api", healthRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/books", bookRouter)
+
+// Error handling middleware must be registered after all routes
+app.use(errorHandler);
 
 export default app;

@@ -15,6 +15,11 @@ const bookSchema = new mongoose.Schema(
         title: {
             type: String,
             required: true
+        },
+        // the key of the PDF file stored in S3
+        fileKey: {
+            type: String,
+            required: true
         }
     },
     {
