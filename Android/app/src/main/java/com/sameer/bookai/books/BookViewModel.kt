@@ -1,16 +1,22 @@
 package com.sameer.bookai.books
 
-import android.util.Log
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
+import com.sameer.bookai.data.createPdfPart
 import com.sameer.bookai.data.remote.RetrofitInstance
 import com.sameer.bookai.data.remote.model.Book
-import com.sameer.bookai.data.remote.model.CreateBookRequest
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
 
 // UI state for the BookViewModel
 data class BookUiState(
@@ -73,10 +79,16 @@ class BookViewModel: ViewModel() {
         }
     }
 
-    fun createBook(title: String) {
+    fun uploadBook(
+        context: Context,
+        uri: Uri,
+        title: String
+    ) {
         viewModelScope.launch {
-            // using copy to update the existing state while keeping other properties intact
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                errorMessage = null
+            )
 
             try {
                 val user = auth.currentUser
@@ -99,23 +111,37 @@ class BookViewModel: ViewModel() {
                     return@launch
                 }
 
-                val newBook = RetrofitInstance.api.createBook(
-                    "Bearer $token",
-                    CreateBookRequest(title)
-                )
+                // Prepare the PDF for multipart upload
+                // Use IO dispatcher for file operations to avoid blocking the main thread
+                val preparedUpload = withContext(Dispatchers.IO) {
+                    createPdfPart(context, uri)
+                }
 
-                // Update the UI state with the newly created book
-                val updatedBooks = _uiState.value.books + newBook
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    books = updatedBooks,
-                    errorMessage = null
-                )
+                // Upload the book using the prepared multipart data
+                try {
+                    // Create the title form field
+                    val titlePart = title.toRequestBody("text/plain".toMediaType())
+
+                    val newBook = RetrofitInstance.api.uploadBook(
+                        token = "Bearer $token",
+                        title = titlePart,
+                        file = preparedUpload.filePart
+                    )
+
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        books = _uiState.value.books + newBook,
+                        errorMessage = null
+                    )
+                } finally {
+                    // Delete the temporary file after the upload is complete
+                    preparedUpload.tempFile.delete()
+                }
 
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = e.message ?: "Failed to create book"
+                    errorMessage = e.message ?: "Failed to upload book"
                 )
             }
         }
