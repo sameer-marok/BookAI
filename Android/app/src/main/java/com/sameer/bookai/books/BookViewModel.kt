@@ -22,7 +22,8 @@ import java.io.File
 data class BookUiState(
     val isLoading: Boolean = false,
     val books: List<Book> = emptyList(),
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val uploadSuccess: Boolean = false
 )
 
 class BookViewModel: ViewModel() {
@@ -35,6 +36,12 @@ class BookViewModel: ViewModel() {
     // Initialize the ViewModel and load books when it's created
     init {
         loadBooks()
+    }
+
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(
+            errorMessage = null
+        )
     }
 
     fun loadBooks() {
@@ -84,10 +91,13 @@ class BookViewModel: ViewModel() {
         uri: Uri,
         title: String
     ) {
+        if (_uiState.value.isLoading) return
+
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
                 isLoading = true,
-                errorMessage = null
+                errorMessage = null,
+                uploadSuccess = false
             )
 
             try {
@@ -96,7 +106,8 @@ class BookViewModel: ViewModel() {
                 if (user == null) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        errorMessage = "User is not authenticated"
+                        errorMessage = "User is not authenticated",
+                        uploadSuccess = false
                     )
                     return@launch
                 }
@@ -106,7 +117,8 @@ class BookViewModel: ViewModel() {
                 if (token == null) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        errorMessage = "Failed to get Firebase ID token"
+                        errorMessage = "Failed to get Firebase ID token",
+                        uploadSuccess = false
                     )
                     return@launch
                 }
@@ -131,7 +143,8 @@ class BookViewModel: ViewModel() {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         books = _uiState.value.books + newBook,
-                        errorMessage = null
+                        errorMessage = null,
+                        uploadSuccess = true
                     )
                 } finally {
                     // Delete the temporary file after the upload is complete
@@ -141,7 +154,8 @@ class BookViewModel: ViewModel() {
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = e.message ?: "Failed to upload book"
+                    errorMessage = e.message ?: "Failed to upload book",
+                    uploadSuccess = false
                 )
             }
         }

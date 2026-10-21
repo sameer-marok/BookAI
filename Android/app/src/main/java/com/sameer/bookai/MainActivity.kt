@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,6 +29,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -500,57 +503,87 @@ fun HomeScreen(
         if (uiState.isLoading) CircularProgressIndicator()
 
         uiState.errorMessage?.let {
-            Text(text = it)
+            Text(text = it, color = MaterialTheme.colorScheme.error)
+        }
+        // Reset the dialog and selected PDF URI when upload is successful
+        LaunchedEffect(uiState.uploadSuccess) {
+            if (uiState.uploadSuccess) {
+                showTitleDialog = false
+                selectedPdfUri = null
+                bookTitle = ""
+            }
         }
         // Show the dialog to enter the book title when a PDF is selected
         if (showTitleDialog) {
             AlertDialog(
                 onDismissRequest = {
-                    showTitleDialog = false
-                    selectedPdfUri = null
-                    bookTitle = ""
+                    // Dismiss the dialog only if not loading
+                    if (!uiState.isLoading) {
+                        showTitleDialog = false
+                        selectedPdfUri = null
+                        bookTitle = ""
+                    }
                 },
                 title = {
                     Text("Choose a title for your book")
                 },
                 text = {
-                    OutlinedTextField(
-                        value = bookTitle,
-                        onValueChange = { bookTitle = it },
-                        label = {
-                            Text("Book title")
-                        },
-                        singleLine = true
-                    )
+                    Column {
+                        OutlinedTextField(
+                            value = bookTitle,
+                            onValueChange = { bookTitle = it },
+                            label = { Text("Book title") },
+                            singleLine = true
+                        )
+
+                        uiState.errorMessage?.let { message ->
+                            Text(
+                                text = message,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
                 },
+
                 confirmButton = {
                     TextButton(
                         onClick = {
-                            if (bookTitle.isNotBlank()) {
-                                selectedPdfUri?.let { uri ->
-                                    bookViewModel.uploadBook(
-                                        context = context,
-                                        uri = uri,
-                                        title = bookTitle.trim()
-                                    )
-                                }
-                                showTitleDialog = false
-                                selectedPdfUri = null
-                                bookTitle = ""
+                            val uri = selectedPdfUri
+
+                            if (uri != null && bookTitle.isNotBlank() && !uiState.isLoading) {
+                                bookViewModel.uploadBook(
+                                    context = context,
+                                    uri = uri,
+                                    title = bookTitle.trim()
+                                )
                             }
                         },
-                        enabled = bookTitle.isNotBlank() && !uiState.isLoading
+                        enabled = bookTitle.isNotBlank() &&
+                                selectedPdfUri != null &&
+                                !uiState.isLoading
                     ) {
-                        Text("Upload")
+                        if (uiState.isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Uploading...")
+                        } else {
+                            Text("Upload")
+                        }
                     }
                 },
                 dismissButton = {
                     TextButton(
                         onClick = {
-                            showTitleDialog = false
-                            selectedPdfUri = null
-                            bookTitle = ""
-                        }
+                            if (!uiState.isLoading) {
+                                showTitleDialog = false
+                                selectedPdfUri = null
+                                bookTitle = ""
+                            }
+                        },
+                        enabled = !uiState.isLoading
                     ) {
                         Text("Cancel")
                     }
@@ -574,6 +607,8 @@ fun HomeScreen(
 
         Button(
             onClick = {
+                // Clear any previous error messages before launching the PDF picker
+                bookViewModel.clearError()
                 // Launch the PDF picker when the button is clicked
                 pdfPicker.launch(arrayOf("application/pdf"))
             },
