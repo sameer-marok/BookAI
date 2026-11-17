@@ -8,6 +8,9 @@ import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { uploadPdf } from "../services/s3Service.js";
 import { s3 } from "../config/s3.js";
 import { env } from "../config/env.js";
+import mongoose from "mongoose";
+import { createUploadUrl } from "../services/s3UploadService.js";
+import { HeadObjectCommand } from "@aws-sdk/client-s3";
 
 const router = Router();
 
@@ -54,6 +57,141 @@ router.get("/", authenticate, async (req, res) => {
     }
 })
 
+// Route to generate a pre-signed upload URL for a new book PDF
+router.post("/upload-url", authenticate, async (req, res) => {
+    try {
+        const {title} = req.body
+
+        if (typeof title !== "string" || !title.trim()) {
+            return res.status(400).json({
+                message: "Title is required",
+            });
+        }
+
+        const user = await User.findOne({
+            firebaseUid: req.user?.firebaseUid,
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found",
+            });
+        }
+
+         // Generate a unique MongoDB ID before uploading
+         // this would be the document id (_id) we will later use to create book in mongoDB
+        const bookId = new mongoose.Types.ObjectId();
+
+        // Generate the S3 object key
+        const fileKey = `users/${user._id}/books/${bookId}.pdf`;
+
+        // Generate a temporary URL for uploading
+        const uploadUrl = await createUploadUrl({ fileKey });
+
+        return res.status(200).json({
+            bookId: bookId.toString(),
+            fileKey,
+            uploadUrl,
+        });
+
+    } catch (error) {
+        console.error("Failed to generate upload URL", error);
+
+        return res.status(500).json({
+            message: "Failed to generate upload URL",
+        });
+    }
+})
+
+// Route to confirm that a book PDF has been successfully uploaded to S3
+// and create the corresponding MongoDB document
+router.post("/confirm-upload", authenticate, async (req, res) => {
+    try {
+        const { bookId, title, fileKey } = req.body;
+
+        if (
+            typeof bookId !== "string" ||
+            !mongoose.isValidObjectId(bookId) ||
+            typeof title !== "string" ||
+            !title.trim() ||
+            typeof fileKey !== "string"
+        ) {
+            return res.status(400).json({
+                message: "Invalid upload details",
+            });
+        }
+        
+        const user = await User.findOne({
+            firebaseUid: req.user?.firebaseUid,
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found",
+            });
+        }
+
+        // Check if the book already exists for this user
+        const existingBook = await Book.findOne({
+            _id: bookId,
+            userId: user._id,
+        });
+
+        // If the book already exists, return its details instead of creating a new one
+        if (existingBook) {
+            return res.status(200).json({
+                id: existingBook._id.toString(),
+                title: existingBook.title,}
+            );
+        }
+
+        // Ensure the key belongs to the authenticated user and book
+        const expectedFileKey =
+            `users/${user._id}/books/${bookId}.pdf`;
+
+        if (fileKey !== expectedFileKey) {
+            return res.status(400).json({
+                message: "Invalid file key",
+            });
+        }
+
+        // Verify that the PDF exists in S3
+        const s3Object = await s3.send(
+            new HeadObjectCommand({
+                Bucket: env.aws.s3Bucket,
+                Key: fileKey,
+            })
+        );
+    
+        if (s3Object.ContentType !== "application/pdf") {
+            return res.status(400).json({
+                message: "Uploaded file is not a PDF",
+            });
+        }
+
+        // Create MongoDB document only after verifying S3
+        const book = await Book.create({
+            _id: new mongoose.Types.ObjectId(bookId),
+            userId: user._id,
+            title: title.trim(),
+            fileKey,
+        });
+
+        return res.status(201).json({
+            id: book._id.toString(),
+            title: book.title,
+        });
+
+    } catch (error) {
+        console.error("Failed to confirm upload", error);
+        return res.status(500).json({
+            message: "Failed to confirm book upload",
+        });
+    }
+})
+
+// DEPRECATED: This route is used to upload a PDF for a specific book via backend
+// New method: Upload directly from Android to S3 using pre-signed URLs
 // Route to upload a PDF for a specific book
 router.post("/upload", authenticate, upload.single("file"), async (req, res) => {
     let fileKey: string | undefined;
