@@ -24,7 +24,7 @@ export function chunkText(text: string): string[] {
                 // Otherwise, find the last word boundary
                 const wordBreak = text.lastIndexOf(" ", end);
 
-                if (wordBreak > start) {
+                if (wordBreak > start + CHUNK_OVERLAP) {
                     end = wordBreak;
                 }
             }
