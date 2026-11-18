@@ -170,12 +170,32 @@ router.post("/confirm-upload", authenticate, async (req, res) => {
         }
 
         // Create MongoDB document only after verifying S3
-        const book = await Book.create({
-            _id: new mongoose.Types.ObjectId(bookId),
-            userId: user._id,
-            title: title.trim(),
-            fileKey,
-        });
+        let book;
+
+        try {
+            book = await Book.create({
+                _id: new mongoose.Types.ObjectId(bookId),
+                userId: user._id,
+                title: title.trim(),
+                fileKey,
+            });
+        } catch (error) {
+            console.error("Failed to create book in MongoDB", error);
+
+            // MongoDB creation failed, delete the uploaded PDF from S3
+            try {
+                await s3.send(
+                    new DeleteObjectCommand({
+                        Bucket: env.aws.s3Bucket,
+                        Key: fileKey,
+                    })
+                );
+            } catch (cleanupError) {
+                console.error("Failed to delete PDF from S3", cleanupError);
+            }
+
+            throw error;
+        }
 
         return res.status(201).json({
             id: book._id.toString(),

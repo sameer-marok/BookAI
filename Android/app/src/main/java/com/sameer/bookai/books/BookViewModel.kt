@@ -5,9 +5,11 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
-import com.sameer.bookai.data.createPdfPart
+import com.sameer.bookai.data.createPdfUploadFile
 import com.sameer.bookai.data.remote.RetrofitInstance
 import com.sameer.bookai.data.remote.model.Book
+import com.sameer.bookai.data.remote.model.ConfirmUploadRequest
+import com.sameer.bookai.data.remote.model.CreateUploadUrlRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,8 +17,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
+import java.io.IOException
 
 // UI state for the BookViewModel
 data class BookUiState(
@@ -99,6 +103,8 @@ class BookViewModel: ViewModel() {
                 errorMessage = null,
                 uploadSuccess = false
             )
+            // Temporary file to hold the PDF during upload
+            var tempFile: File? = null
 
             try {
                 val user = auth.currentUser
@@ -123,33 +129,59 @@ class BookViewModel: ViewModel() {
                     return@launch
                 }
 
-                // Prepare the PDF for multipart upload
-                // Use IO dispatcher for file operations to avoid blocking the main thread
+                val authToken = "Bearer $token"
+
+                // 1. Request a pre-signed upload URL
+                val uploadDetails = RetrofitInstance.api.createUploadUrl(
+                    token = authToken,
+                    request = CreateUploadUrlRequest(title)
+                )
+
+                // 2. Prepare the PDF
                 val preparedUpload = withContext(Dispatchers.IO) {
-                    createPdfPart(context, uri)
+                    createPdfUploadFile(context, uri)
                 }
 
-                // Upload the book using the prepared multipart data
-                try {
-                    // Create the title form field
-                    val titlePart = title.toRequestBody("text/plain".toMediaType())
+                tempFile = preparedUpload.tempFile
 
-                    val newBook = RetrofitInstance.api.uploadBook(
-                        token = "Bearer $token",
-                        title = titlePart,
-                        file = preparedUpload.filePart
-                    )
-
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        books = _uiState.value.books + newBook,
-                        errorMessage = null,
-                        uploadSuccess = true
-                    )
-                } finally {
-                    // Delete the temporary file after the upload is complete
-                    preparedUpload.tempFile.delete()
+                val maxFileSize = 20 * 1024 * 1024L
+                // Check if the file size exceeds the maximum allowed size (20 MB)
+                if (preparedUpload.tempFile.length() > maxFileSize) {
+                    throw IllegalArgumentException("PDF must not exceed 20 MB")
                 }
+
+                // 3. Upload PDF directly to S3
+                val requestBody = preparedUpload.tempFile.asRequestBody(
+                    "application/pdf".toMediaType()
+                )
+
+                val s3Response = RetrofitInstance.api.uploadPdfToS3(
+                    uploadUrl = uploadDetails.uploadUrl,
+                    contentType = "application/pdf",
+                    file = requestBody
+                )
+
+                if (!s3Response.isSuccessful) {
+                    throw IOException("S3 upload failed: HTTP ${s3Response.code()}")
+                }
+
+                // 4. Confirm upload with our backend
+                val newBook = RetrofitInstance.api.confirmUpload(
+                    token = authToken,
+                    request = ConfirmUploadRequest(
+                        bookId = uploadDetails.bookId,
+                        title = title,
+                        fileKey = uploadDetails.fileKey
+                    )
+                )
+
+                // 5. Update UI
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    books = _uiState.value.books + newBook,
+                    errorMessage = null,
+                    uploadSuccess = true
+                )
 
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
@@ -157,6 +189,9 @@ class BookViewModel: ViewModel() {
                     errorMessage = e.message ?: "Failed to upload book",
                     uploadSuccess = false
                 )
+            } finally {
+                // Clean up the temporary file
+                tempFile?.delete()
             }
         }
     }
