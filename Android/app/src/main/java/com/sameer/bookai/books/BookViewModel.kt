@@ -144,6 +144,12 @@ class BookViewModel: ViewModel() {
 
                 tempFile = preparedUpload.tempFile
 
+                val maxFileSize = 20 * 1024 * 1024L
+                // Check if the file size exceeds the maximum allowed size (20 MB)
+                if (preparedUpload.tempFile.length() > maxFileSize) {
+                    throw IllegalArgumentException("PDF must not exceed 20 MB")
+                }
+
                 // 3. Upload PDF directly to S3
                 val requestBody = preparedUpload.tempFile.asRequestBody(
                     "application/pdf".toMediaType()
