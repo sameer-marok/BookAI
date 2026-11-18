@@ -19,7 +19,8 @@
     "express": "^5.2.1",
     "firebase-admin": "^14.4.0",
     "mongoose": "^9.10.2",
-    "multer": "^2.4.0"
+    "multer": "^2.4.0",
+    "pdf-parse": "^2.4.5"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

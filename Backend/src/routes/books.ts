@@ -11,6 +11,8 @@ import { env } from "../config/env.js";
 import mongoose from "mongoose";
 import { createUploadUrl } from "../services/s3UploadService.js";
 import { HeadObjectCommand } from "@aws-sdk/client-s3";
+import { extractPdfText } from "../services/pdfService.js";
+import { chunkText } from "../services/chunkService.js";
 
 const router = Router();
 
@@ -206,6 +208,60 @@ router.post("/confirm-upload", authenticate, async (req, res) => {
         console.error("Failed to confirm upload", error);
         return res.status(500).json({
             message: "Failed to confirm book upload",
+        });
+    }
+})
+
+// Route to extract text from a PDF of a specific book
+router.get("/:bookId/extract", authenticate, async (req, res) => {
+    try {
+        const {bookId} = req.params
+
+        if (!mongoose.isValidObjectId(bookId)) {
+            return res.status(400).json({
+                message: "Invalid book ID",
+            });
+        }
+
+        const user = await User.findOne({
+            firebaseUid: req.user?.firebaseUid,
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found",
+            });
+        }
+
+        const book = await Book.findOne({
+            _id: bookId,
+            userId: user._id,
+        });
+
+        if (!book) {
+            return res.status(404).json({
+                message: "Book not found",
+            });
+        }
+
+        const text = await extractPdfText(book.fileKey);
+
+        // Split the extracted text into chunks
+        const chunks = chunkText(text);
+
+        return res.status(200).json({
+            bookId: book._id.toString(),
+            title: book.title,
+            totalChunks: chunks.length,
+            firstChunk: chunks[0],
+            lastChunk: chunks[chunks.length - 1],
+        });
+
+    } catch (error) {
+        console.error("Failed to extract PDF text", error);
+
+        return res.status(500).json({
+            message: "Failed to extract PDF text",
         });
     }
 })
