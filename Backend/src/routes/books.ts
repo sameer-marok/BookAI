@@ -13,6 +13,8 @@ import { createUploadUrl } from "../services/s3UploadService.js";
 import { HeadObjectCommand } from "@aws-sdk/client-s3";
 import { extractPdfText } from "../services/pdfService.js";
 import { chunkText } from "../services/chunkService.js";
+import { generateEmbeddings } from "../services/embeddingService.js";
+import { BookChunk } from '../models/BookChunk.js';
 
 const router = Router();
 
@@ -249,12 +251,24 @@ router.get("/:bookId/extract", authenticate, async (req, res) => {
         // Split the extracted text into chunks
         const chunks = chunkText(text);
 
-        return res.status(200).json({
-            bookId: book._id.toString(),
+        const embeddings = await generateEmbeddings(chunks)
+
+        const chunkDocuments = chunks.map((chunk, index) => ({
+            bookId: book._id,
+            userId: user._id,
+            chunkIndex: index,
+            text: chunk,
+            embedding: embeddings[index],
+        }));
+
+        await BookChunk.insertMany(chunkDocuments);
+
+        return res.json({
+            bookId: book.id,
             title: book.title,
             totalChunks: chunks.length,
-            firstChunk: chunks[0],
-            lastChunk: chunks[chunks.length - 1],
+            totalEmbeddings: embeddings.length,
+            embeddingDimensions: embeddings[0]?.length ?? 0,
         });
 
     } catch (error) {
