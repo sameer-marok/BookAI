@@ -15,6 +15,7 @@ import { extractPdfText } from "../services/pdfService.js";
 import { chunkText } from "../services/chunkService.js";
 import { generateEmbeddings } from "../services/embeddingService.js";
 import { BookChunk } from '../models/BookChunk.js';
+import { answerBookQuestion } from "../services/ragService.js";
 
 const router = Router();
 
@@ -279,6 +280,58 @@ router.get("/:bookId/extract", authenticate, async (req, res) => {
         });
     }
 })
+
+// Route to ask a question about a specific book using the RAG service
+router.post("/:bookId/ask", authenticate, async (req, res) => {
+    try {
+        const { bookId } = req.params;
+        const { question } = req.body;
+
+        if (typeof bookId !== "string") {
+            return res.status(400).json({
+                message: "Invalid book ID",
+            });
+        }
+
+        if (!question || typeof question !== "string" || !question.trim()) {
+            return res.status(400).json({
+                message: "Question is required",
+            });
+        }
+
+        const user = await User.findOne({
+            firebaseUid: req.user?.firebaseUid,
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found",
+            });
+        }
+
+        const book = await Book.findOne({
+            _id: bookId,
+            userId: user._id,
+        });
+
+        if (!book) {
+            return res.status(404).json({
+                message: "Book not found",
+            });
+        }
+
+        const answer = await answerBookQuestion(question, bookId);
+
+        return res.json({ answer });
+
+    } catch (error) {
+        console.error("Error answering book question:", error);
+
+        return res.status(500).json({
+            message: "Failed to answer question",
+        });
+    }
+});
 
 // DEPRECATED: This route is used to upload a PDF for a specific book via backend
 // New method: Upload directly from Android to S3 using pre-signed URLs
