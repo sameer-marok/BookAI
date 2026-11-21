@@ -29,4 +29,8 @@ export const env = {
         secretAccessKey: getEnv("AWS_SECRET_ACCESS_KEY"),
         s3Bucket: getEnv("AWS_S3_BUCKET"),
     },
+
+    openai: {
+        apiKey: getEnv("OPENAI_API_KEY"),
+    },
 };

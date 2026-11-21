@@ -20,6 +20,7 @@
     "firebase-admin": "^14.4.0",
     "mongoose": "^9.10.2",
     "multer": "^2.4.0",
+    "openai": "^7.60.0",
     "pdf-parse": "^2.4.5"
   },
   "devDependencies": {
